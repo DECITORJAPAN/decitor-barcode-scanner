@@ -368,7 +368,7 @@ async function startScanner() {
      * 背面カメラを優先
      */
     const devices =
-      await ZXing.BrowserCodeReader
+      await codeReader
         .listVideoInputDevices();
 
 
