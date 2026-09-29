@@ -1,268 +1,304 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport"
-      content="width=device-width, initial-scale=1.0,
-               maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8">
 
-<title>DECITOR BARCODE SCANNER</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0,
+             maximum-scale=1.0, user-scalable=no"
+  >
 
-<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <title>DECITOR BARCODE SCANNER</title>
 
-<style>
-* {
-  box-sizing: border-box;
-}
+  <!-- Quagga2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.12.1/dist/quagga.min.js"></script>
 
-body {
-  margin: 0;
-  background: #f3f5f7;
-  color: #222;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Noto Sans JP",
-    "Yu Gothic",
-    sans-serif;
-}
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-.app {
-  width: 100%;
-  max-width: 620px;
-  min-height: 100vh;
-  margin: 0 auto;
-  background: #fff;
-}
+    body {
+      margin: 0;
+      background: #f3f5f7;
+      color: #222;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Noto Sans JP",
+        "Yu Gothic",
+        sans-serif;
+    }
 
-.header {
-  padding: 18px;
-  background: #1f2937;
-  color: #fff;
-}
+    .app {
+      width: 100%;
+      max-width: 620px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: #fff;
+    }
 
-.header-title {
-  font-size: 18px;
-  font-weight: 700;
-}
+    .header {
+      padding: 18px;
+      background: #1f2937;
+      color: #fff;
+    }
 
-.header-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  opacity: .75;
-}
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
 
-.content {
-  padding: 22px 16px 40px;
-}
+    .header-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      opacity: .75;
+    }
 
-.title {
-  margin: 0 0 8px;
-  font-size: 24px;
-  font-weight: 700;
-}
+    .content {
+      padding: 22px 16px 40px;
+    }
 
-.description {
-  margin-bottom: 18px;
-  color: #63707a;
-  font-size: 14px;
-  line-height: 1.7;
-}
+    .title {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 700;
+    }
 
-.camera-box {
-  position: relative;
-  width: 100%;
-  height: 390px;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #000;
-}
+    .description {
+      margin-bottom: 18px;
+      color: #63707a;
+      font-size: 14px;
+      line-height: 1.7;
+    }
 
-#video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+    /*
+     * Quaggaがカメラ映像を
+     * この中へ生成する
+     */
+    #interactive {
+      position: relative;
+      width: 100%;
+      height: 390px;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #000;
+    }
 
-/* 実際に解析する位置 */
-.scan-guide {
-  position: absolute;
-  left: 4%;
-  top: 50%;
-  width: 92%;
-  height: 135px;
-  transform: translateY(-50%);
-  border: 4px solid #fff;
-  border-radius: 8px;
-  pointer-events: none;
-}
+    #interactive video,
+    #interactive canvas {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      top: 0;
+      left: 0;
+    }
 
-.scan-line {
-  position: absolute;
-  left: 7%;
-  top: 50%;
-  width: 86%;
-  height: 2px;
-  background: #ff4040;
-  pointer-events: none;
-}
+    /*
+     * QuaggaのデバッグCanvasは非表示
+     */
+    #interactive canvas.drawingBuffer {
+      display: none;
+    }
 
-.status {
-  margin-top: 16px;
-  padding: 13px;
-  border-radius: 8px;
-  background: #eef3f6;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 700;
-}
+    /*
+     * 読取ガイド
+     */
+    .scan-guide {
+      position: absolute;
+      z-index: 20;
+      left: 4%;
+      top: 50%;
+      width: 92%;
+      height: 145px;
+      transform: translateY(-50%);
+      border: 4px solid #fff;
+      border-radius: 8px;
+      pointer-events: none;
+    }
 
-.success {
-  background: #e8f6ed;
-  color: #176b4d;
-}
+    .scan-line {
+      position: absolute;
+      z-index: 21;
+      left: 7%;
+      top: 50%;
+      width: 86%;
+      height: 2px;
+      background: #ff4040;
+      pointer-events: none;
+    }
 
-.error {
-  background: #fdecea;
-  color: #a61b13;
-}
+    .status {
+      margin-top: 16px;
+      padding: 13px;
+      border-radius: 8px;
+      background: #eef3f6;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+    }
 
-#resultBox {
-  display: none;
-  margin-top: 18px;
-  padding: 18px;
-  border: 1px solid #bcd9c8;
-  border-radius: 10px;
-  background: #f0f8f3;
-  text-align: center;
-}
+    .success {
+      background: #e8f6ed;
+      color: #176b4d;
+    }
 
-.result-label {
-  font-size: 14px;
-  color: #63707a;
-}
+    .error {
+      background: #fdecea;
+      color: #a61b13;
+    }
 
-.number {
-  margin-top: 8px;
-  font-size: 26px;
-  font-weight: 700;
-  word-break: break-all;
-}
+    #resultBox {
+      display: none;
+      margin-top: 18px;
+      padding: 20px 16px;
+      border: 1px solid #bcd9c8;
+      border-radius: 10px;
+      background: #f0f8f3;
+      text-align: center;
+    }
 
-.format {
-  margin-top: 8px;
-  color: #63707a;
-  font-size: 12px;
-}
+    .result-label {
+      font-size: 14px;
+      color: #63707a;
+    }
 
-button {
-  width: 100%;
-  min-height: 54px;
-  margin-top: 16px;
-  border: 0;
-  border-radius: 10px;
-  background: #176b4d;
-  color: #fff;
-  font-size: 17px;
-  font-weight: 700;
-}
+    .raw-label {
+      margin-top: 18px;
+      font-size: 12px;
+      color: #7a858e;
+    }
 
-.secondary {
-  background: #fff;
-  border: 1px solid #aeb8c1;
-  color: #374650;
-}
+    .raw-number {
+      margin-top: 4px;
+      font-size: 16px;
+      color: #555;
+      word-break: break-all;
+    }
 
-.hint {
-  margin-top: 14px;
-  color: #74808a;
-  font-size: 12px;
-  line-height: 1.7;
-  text-align: center;
-}
+    .number {
+      margin-top: 8px;
+      font-size: 30px;
+      font-weight: 700;
+      word-break: break-all;
+    }
 
-/* 解析用。画面には表示しない */
-#scanCanvas {
-  display: none;
-}
-</style>
+    .format {
+      margin-top: 8px;
+      color: #63707a;
+      font-size: 13px;
+    }
+
+    button {
+      width: 100%;
+      min-height: 54px;
+      margin-top: 18px;
+      border: 0;
+      border-radius: 10px;
+      background: #176b4d;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .hint {
+      margin-top: 16px;
+      color: #74808a;
+      font-size: 12px;
+      line-height: 1.8;
+      text-align: center;
+    }
+  </style>
 </head>
 
 <body>
 
 <div class="app">
 
-<header class="header">
-  <div class="header-title">
-    DECITOR BARCODE SCANNER
-  </div>
+  <header class="header">
+    <div class="header-title">
+      DECITOR BARCODE SCANNER
+    </div>
 
-  <div class="header-sub">
-    入荷問合番号 読取
-  </div>
-</header>
+    <div class="header-sub">
+      Quagga2 無料版テスト
+    </div>
+  </header>
 
-<main class="content">
 
-<h1 class="title">
-  📷 バーコード読取
-</h1>
+  <main class="content">
 
-<div class="description">
-  問合番号のバーコードを白い枠の中央に合わせてください。<br>
-  認識すると自動で読み取ります。
+    <h1 class="title">
+      📷 バーコード読取
+    </h1>
+
+    <div class="description">
+      送り状の問合番号バーコードを
+      白い枠の中央に合わせてください。<br>
+      認識すると自動で停止します。
+    </div>
+
+
+    <div id="interactive">
+
+      <div class="scan-guide"></div>
+      <div class="scan-line"></div>
+
+    </div>
+
+
+    <div id="status" class="status">
+      カメラを起動しています...
+    </div>
+
+
+    <div id="resultBox">
+
+      <div class="result-label">
+        読み取り結果
+      </div>
+
+      <div
+        id="resultNumber"
+        class="number">
+      </div>
+
+      <div
+        id="resultFormat"
+        class="format">
+      </div>
+
+      <!-- テスト中だけ元データも表示 -->
+      <div class="raw-label">
+        Quagga2が実際に読んだ値
+      </div>
+
+      <div
+        id="rawNumber"
+        class="raw-number">
+      </div>
+
+      <button
+        type="button"
+        onclick="restartScanner()">
+        もう一度読む
+      </button>
+
+    </div>
+
+
+    <div class="hint">
+      今回はテスト版です。<br>
+      まず佐川の問合番号バーコードが
+      読めるかだけ確認します。
+    </div>
+
+  </main>
+
 </div>
 
-<div class="camera-box">
-
-  <video
-    id="video"
-    autoplay
-    muted
-    playsinline>
-  </video>
-
-  <div class="scan-guide"></div>
-  <div class="scan-line"></div>
-
-</div>
-
-<div id="status" class="status">
-  カメラを起動しています...
-</div>
-
-<div id="resultBox">
-
-  <div class="result-label">
-    読み取り結果
-  </div>
-
-  <div id="resultNumber" class="number"></div>
-
-  <div id="resultFormat" class="format"></div>
-
-  <button type="button" onclick="returnToPortal()">
-    入荷ポータルへ戻る
-  </button>
-
-  <button
-    type="button"
-    class="secondary"
-    onclick="restartScanner()">
-    もう一度読む
-  </button>
-
-</div>
-
-<div class="hint">
-  バーコード全体が白枠の中に入ればOKです。<br>
-  無理にカメラを近づける必要はありません。
-</div>
-
-<canvas id="scanCanvas"></canvas>
-
-</main>
-</div>
 
 <script>
 
@@ -270,16 +306,12 @@ button {
  * STATE
  *************************************************/
 
-let stream = null;
-let scanTimer = null;
+let scannerRunning = false;
 let scanLocked = false;
-let scannedNumber = '';
-
-let reader = null;
 
 
 /*************************************************
- * LOAD
+ * START
  *************************************************/
 
 window.addEventListener(
@@ -288,505 +320,311 @@ window.addEventListener(
 );
 
 
-/*************************************************
- * START
- *************************************************/
-
-async function startScanner() {
+function startScanner() {
 
   scanLocked = false;
-  scannedNumber = '';
 
   document.getElementById(
     'resultBox'
   ).style.display = 'none';
+
 
   setStatus(
     'カメラを起動しています...',
     ''
   );
 
-  try {
 
-    /*
-     * 1次元バーコードだけを対象
-     */
-    const hints = new Map();
+  Quagga.init(
 
-    hints.set(
-      ZXing.DecodeHintType.POSSIBLE_FORMATS,
-      [
-        ZXing.BarcodeFormat.CODE_128,
-        ZXing.BarcodeFormat.CODE_39,
-        ZXing.BarcodeFormat.CODE_93,
-        ZXing.BarcodeFormat.CODABAR,
-        ZXing.BarcodeFormat.ITF,
-        ZXing.BarcodeFormat.EAN_13,
-        ZXing.BarcodeFormat.EAN_8,
-        ZXing.BarcodeFormat.UPC_A,
-        ZXing.BarcodeFormat.UPC_E
-      ]
-    );
+    {
 
-    hints.set(
-      ZXing.DecodeHintType.TRY_HARDER,
-      true
-    );
+      inputStream: {
 
-    reader =
-      new ZXing.BrowserMultiFormatReader(
-        hints
-      );
+        name: 'Live',
 
+        type: 'LiveStream',
 
-    /*
-     * iPhone背面カメラ
-     * 高めの解像度を要求
-     */
-    const constraints = {
+        target:
+          document.querySelector(
+            '#interactive'
+          ),
 
-      audio: false,
+        constraints: {
 
-      video: {
+          facingMode:
+            'environment',
 
-        facingMode: {
-          ideal: 'environment'
+          width: {
+            ideal: 1920
+          },
+
+          height: {
+            ideal: 1080
+          }
+
         },
 
-        width: {
-          ideal: 1920
-        },
-
-        height: {
-          ideal: 1080
+        /*
+         * 中央付近だけを解析
+         *
+         * 上下を大きく削り、
+         * 横長バーコードに集中させる
+         */
+        area: {
+          top: '30%',
+          right: '3%',
+          left: '3%',
+          bottom: '30%'
         }
 
-      }
-
-    };
+      },
 
 
-    stream =
-      await navigator.mediaDevices
-        .getUserMedia(
-          constraints
+      locator: {
+
+        /*
+         * 小さいバーコード対策
+         */
+        halfSample: false,
+
+        patchSize: 'medium'
+
+      },
+
+
+      numOfWorkers:
+        navigator.hardwareConcurrency
+          ? Math.min(
+              navigator.hardwareConcurrency,
+              4
+            )
+          : 2,
+
+
+      frequency: 10,
+
+
+      decoder: {
+
+        /*
+         * 佐川を最優先。
+         *
+         * Scanditでは
+         * Codabarとして読めた。
+         */
+        readers: [
+
+          'codabar_reader',
+
+          'code_128_reader',
+
+          'code_39_reader',
+
+          'i2of5_reader',
+
+          'ean_reader',
+
+          'ean_8_reader'
+
+        ],
+
+        multiple: false
+
+      },
+
+
+      locate: true
+
+    },
+
+
+    function(error) {
+
+      if (error) {
+
+        console.error(
+          'Quagga init error:',
+          error
         );
 
 
-    const video =
-      document.getElementById(
-        'video'
-      );
+        setStatus(
+          'カメラ起動エラー：' +
+          (
+            error.message ||
+            String(error)
+          ),
+          'error'
+        );
 
-    video.srcObject =
-      stream;
+        return;
 
-    await video.play();
+      }
+
+
+      try {
+
+        Quagga.start();
+
+        scannerRunning = true;
+
+
+        setStatus(
+          'バーコードを読み取ってください',
+          ''
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+        setStatus(
+          'スキャン開始エラー：' +
+          (
+            error.message ||
+            String(error)
+          ),
+          'error'
+        );
+
+      }
+
+    }
+
+  );
+
+}
+
+
+/*************************************************
+ * DETECT
+ *************************************************/
+
+Quagga.onDetected(
+  function(result) {
+
+    if (scanLocked) {
+      return;
+    }
+
+
+    if (
+      !result ||
+      !result.codeResult ||
+      !result.codeResult.code
+    ) {
+      return;
+    }
+
+
+    const raw =
+      String(
+        result.codeResult.code
+      ).trim();
 
 
     /*
-     * 対応していれば
-     * continuous autofocus を要求
+     * あまりにも短い誤読は無視
+     *
+     * さっきの C-DA のような
+     * 誤認識対策にもなる。
+     */
+    if (raw.length < 8) {
+      return;
+    }
+
+
+    const normalized =
+      normalizeTracking(
+        raw
+      );
+
+
+    /*
+     * 正規化後も
+     * ある程度の長さが必要
+     */
+    if (
+      !normalized ||
+      normalized.length < 8
+    ) {
+      return;
+    }
+
+
+    /*
+     * 1件読んだ瞬間にロック
+     */
+    scanLocked = true;
+
+
+    stopScanner();
+
+
+    const format =
+      result.codeResult.format || '';
+
+
+    document.getElementById(
+      'resultNumber'
+    ).textContent =
+      normalized;
+
+
+    document.getElementById(
+      'rawNumber'
+    ).textContent =
+      raw;
+
+
+    document.getElementById(
+      'resultFormat'
+    ).textContent =
+      format
+        ? '形式：' + format
+        : '';
+
+
+    document.getElementById(
+      'resultBox'
+    ).style.display =
+      'block';
+
+
+    setStatus(
+      '✓ 読み取り完了',
+      'success'
+    );
+
+
+    /*
+     * iPhoneはvibrate非対応の場合もあるので
+     * エラーになっても無視
      */
     try {
 
-      const track =
-        stream.getVideoTracks()[0];
-
-      const capabilities =
-        track.getCapabilities
-          ? track.getCapabilities()
-          : {};
-
       if (
-        capabilities.focusMode &&
-        capabilities.focusMode.includes(
-          'continuous'
-        )
+        navigator.vibrate
       ) {
 
-        await track.applyConstraints({
-          advanced: [
-            {
-              focusMode:
-                'continuous'
-            }
-          ]
-        });
+        navigator.vibrate(
+          100
+        );
 
       }
 
-    } catch (e) {
-
-      console.log(
-        'focus setting:',
-        e
-      );
-
-    }
-
-
-    setStatus(
-      'バーコードを読み取ってください',
-      ''
-    );
-
-
-    /*
-     * 250msごとに
-     * 白枠部分だけ解析
-     */
-    scanTimer =
-      setInterval(
-        scanFrame,
-        250
-      );
-
-  } catch (error) {
-
-    console.error(error);
-
-    setStatus(
-      'カメラ起動エラー：' +
-      (
-        error && error.message
-          ? error.message
-          : String(error)
-      ),
-      'error'
-    );
+    } catch (e) {}
 
   }
-
-}
-
-
-/*************************************************
- * SCAN FRAME
- *************************************************/
-
-function scanFrame() {
-
-  if (
-    scanLocked ||
-    !reader
-  ) {
-    return;
-  }
-
-
-  const video =
-    document.getElementById(
-      'video'
-    );
-
-
-  if (
-    !video.videoWidth ||
-    !video.videoHeight
-  ) {
-    return;
-  }
-
-
-  const canvas =
-    document.getElementById(
-      'scanCanvas'
-    );
-
-
-  const ctx =
-    canvas.getContext(
-      '2d',
-      {
-        willReadFrequently: true
-      }
-    );
-
-
-  /*
-   * カメラ映像の中央部分のみ使用
-   *
-   * 横：94%
-   * 縦：38%
-   *
-   * 送り状の横長バーコード向け
-   */
-  const sourceWidth =
-    Math.floor(
-      video.videoWidth * 0.94
-    );
-
-  const sourceHeight =
-    Math.floor(
-      video.videoHeight * 0.38
-    );
-
-
-  const sourceX =
-    Math.floor(
-      (
-        video.videoWidth -
-        sourceWidth
-      ) / 2
-    );
-
-
-  const sourceY =
-    Math.floor(
-      (
-        video.videoHeight -
-        sourceHeight
-      ) / 2
-    );
-
-
-  /*
-   * 切り出した映像を
-   * 2倍サイズへ拡大
-   */
-  const scale = 2;
-
-
-  canvas.width =
-    sourceWidth * scale;
-
-  canvas.height =
-    sourceHeight * scale;
-
-
-  ctx.imageSmoothingEnabled =
-    false;
-
-
-  ctx.drawImage(
-    video,
-
-    sourceX,
-    sourceY,
-    sourceWidth,
-    sourceHeight,
-
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
-
-
-  /*
-   * ZXingで
-   * 切り出しCanvasだけ解析
-   */
-  try {
-
-    const result =
-      reader.decodeFromCanvas(
-        canvas
-      );
-
-
-    if (result) {
-      barcodeSuccess(
-        result
-      );
-    }
-
-  } catch (error) {
-
-    /*
-     * 読めないフレームは正常。
-     * 次の250msで再試行。
-     */
-
-    if (
-      !(
-        error instanceof
-        ZXing.NotFoundException
-      )
-    ) {
-
-      console.log(
-        'decode:',
-        error
-      );
-
-    }
-
-  }
-
-}
-
-
-/*************************************************
- * SUCCESS
- *************************************************/
-
-async function barcodeSuccess(
-  result
-) {
-
-  if (scanLocked) {
-    return;
-  }
-
-
-  const raw =
-    result.getText();
-
-
-  const value =
-    normalizeTracking(
-      raw
-    );
-
-
-  if (!value) {
-    return;
-  }
-
-
-  scanLocked = true;
-  scannedNumber = value;
-
-
-  if (scanTimer) {
-
-    clearInterval(
-      scanTimer
-    );
-
-    scanTimer = null;
-
-  }
-
-
-  try {
-
-    if (
-      navigator.vibrate
-    ) {
-
-      navigator.vibrate(
-        100
-      );
-
-    }
-
-  } catch (e) {}
-
-
-  let formatName = '';
-
-  try {
-
-    const format =
-      result.getBarcodeFormat();
-
-    formatName =
-      barcodeFormatName(
-        format
-      );
-
-  } catch (e) {}
-
-
-  /*
-   * 読めたらカメラ停止
-   */
-  stopCamera();
-
-
-  document.getElementById(
-    'resultNumber'
-  ).textContent =
-    scannedNumber;
-
-
-  document.getElementById(
-    'resultFormat'
-  ).textContent =
-    formatName
-      ? '形式：' + formatName
-      : '';
-
-
-  document.getElementById(
-    'resultBox'
-  ).style.display =
-    'block';
-
-
-  setStatus(
-    '✓ 読み取り完了',
-    'success'
-  );
-
-}
-
-
-/*************************************************
- * FORMAT NAME
- *************************************************/
-
-function barcodeFormatName(
-  format
-) {
-
-  const map = {};
-
-  map[
-    ZXing.BarcodeFormat.CODE_128
-  ] = 'CODE 128';
-
-  map[
-    ZXing.BarcodeFormat.CODE_39
-  ] = 'CODE 39';
-
-  map[
-    ZXing.BarcodeFormat.CODE_93
-  ] = 'CODE 93';
-
-  map[
-    ZXing.BarcodeFormat.CODABAR
-  ] = 'CODABAR';
-
-  map[
-    ZXing.BarcodeFormat.ITF
-  ] = 'ITF';
-
-  map[
-    ZXing.BarcodeFormat.EAN_13
-  ] = 'EAN-13 / JAN';
-
-  map[
-    ZXing.BarcodeFormat.EAN_8
-  ] = 'EAN-8';
-
-  map[
-    ZXing.BarcodeFormat.UPC_A
-  ] = 'UPC-A';
-
-  map[
-    ZXing.BarcodeFormat.UPC_E
-  ] = 'UPC-E';
-
-
-  return (
-    map[format] ||
-    String(format)
-  );
-
-}
+);
 
 
 /*************************************************
  * NORMALIZE
  *************************************************/
 
-function normalizeTracking(
-  value
-) {
+function normalizeTracking(value) {
 
   let tracking =
     String(
@@ -800,7 +638,25 @@ function normalizeTracking(
 
 
   /*
-   * 前後の英字を除去
+   * Codabar
+   *
+   * D442682535934D
+   * ↓
+   * 442682535934
+   *
+   * A/B/C/D の
+   * スタート・ストップ文字を除去
+   */
+  tracking =
+    tracking.replace(
+      /^[A-D](.+)[A-D]$/i,
+      '$1'
+    );
+
+
+  /*
+   * その他の送り状で
+   * 前後に英字が付くケースにも対応
    *
    * d500984340920d
    * ↓
@@ -818,41 +674,51 @@ function normalizeTracking(
       );
 
 
+  /*
+   * ハイフンが返ってきた場合は除去
+   *
+   * 4426-8253-5934
+   * ↓
+   * 442682535934
+   */
+  tracking =
+    tracking.replace(
+      /-/g,
+      ''
+    );
+
+
   return tracking;
 
 }
 
 
 /*************************************************
- * STOP CAMERA
+ * STOP
  *************************************************/
 
-function stopCamera() {
+function stopScanner() {
 
-  if (scanTimer) {
+  if (!scannerRunning) {
+    return;
+  }
 
-    clearInterval(
-      scanTimer
+
+  try {
+
+    Quagga.stop();
+
+  } catch (error) {
+
+    console.log(
+      'Quagga stop:',
+      error
     );
 
-    scanTimer = null;
-
   }
 
 
-  if (stream) {
-
-    stream
-      .getTracks()
-      .forEach(
-        track =>
-          track.stop()
-      );
-
-  }
-
-
-  stream = null;
+  scannerRunning = false;
 
 }
 
@@ -861,12 +727,12 @@ function stopCamera() {
  * RESTART
  *************************************************/
 
-async function restartScanner() {
+function restartScanner() {
 
-  stopCamera();
+  stopScanner();
 
   scanLocked = false;
-  scannedNumber = '';
+
 
   document.getElementById(
     'resultBox'
@@ -874,33 +740,12 @@ async function restartScanner() {
     'none';
 
 
-  await startScanner();
-
-}
-
-
-/*************************************************
- * RETURN TO PORTAL
- *************************************************/
-
-function returnToPortal() {
-
-  if (!scannedNumber) {
-    return;
-  }
-
-
   /*
-   * 現在は単体テスト。
-   * 成功確認後、
-   * GASポータルへ番号を返す。
+   * 少し待って再起動
    */
-
-  alert(
-    '読取番号：' +
-    scannedNumber +
-    '\n\n' +
-    'バーコード読取成功です。'
+  setTimeout(
+    startScanner,
+    300
   );
 
 }
@@ -937,12 +782,12 @@ function setStatus(
 
 
 /*************************************************
- * PAGE CLOSE
+ * CLOSE
  *************************************************/
 
 window.addEventListener(
   'pagehide',
-  stopCamera
+  stopScanner
 );
 
 </script>
