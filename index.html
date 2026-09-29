@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
 
@@ -10,9 +11,11 @@
 
   <title>DECITOR BARCODE SCANNER</title>
 
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- ZXing -->
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 
   <style>
+
     * {
       box-sizing: border-box;
     }
@@ -65,22 +68,51 @@
     }
 
     .description {
-      margin-bottom: 20px;
+      margin-bottom: 18px;
       color: #63707a;
       font-size: 14px;
       line-height: 1.7;
     }
 
-    #reader {
+    .camera-box {
+      position: relative;
       width: 100%;
       overflow: hidden;
       border-radius: 12px;
       background: #000;
     }
 
-    #reader video {
-      width: 100% !important;
+    #video {
+      display: block;
+      width: 100%;
+      min-height: 300px;
+      background: #000;
       object-fit: cover;
+    }
+
+    /*
+     * 送り状の横長バーコード用ガイド
+     */
+    .scan-guide {
+      position: absolute;
+      top: 50%;
+      left: 5%;
+      width: 90%;
+      height: 120px;
+      transform: translateY(-50%);
+      border: 4px solid rgba(255,255,255,.95);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .scan-line {
+      position: absolute;
+      top: 50%;
+      left: 8%;
+      width: 84%;
+      height: 2px;
+      background: rgba(255, 70, 70, .85);
+      pointer-events: none;
     }
 
     .status {
@@ -91,6 +123,7 @@
       text-align: center;
       font-size: 14px;
       font-weight: 700;
+      line-height: 1.6;
     }
 
     .success {
@@ -103,11 +136,32 @@
       color: #a61b13;
     }
 
+    #resultBox {
+      display: none;
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid #bcd9c8;
+      border-radius: 10px;
+      background: #f0f8f3;
+      text-align: center;
+    }
+
+    .result-label {
+      font-size: 14px;
+      color: #63707a;
+    }
+
     .number {
-      margin-top: 12px;
-      font-size: 23px;
+      margin-top: 8px;
+      font-size: 25px;
       font-weight: 700;
       word-break: break-all;
+    }
+
+    .format {
+      margin-top: 7px;
+      color: #63707a;
+      font-size: 12px;
     }
 
     button {
@@ -129,23 +183,24 @@
       color: #374650;
     }
 
-    #resultBox {
-      display: none;
-      margin-top: 18px;
-      padding: 18px;
-      border: 1px solid #bcd9c8;
-      border-radius: 10px;
-      background: #f0f8f3;
+    .hint {
+      margin-top: 14px;
+      color: #74808a;
+      font-size: 12px;
+      line-height: 1.6;
       text-align: center;
     }
+
   </style>
 </head>
+
 
 <body>
 
 <div class="app">
 
   <header class="header">
+
     <div class="header-title">
       DECITOR BARCODE SCANNER
     </div>
@@ -153,7 +208,9 @@
     <div class="header-sub">
       入荷問合番号 読取
     </div>
+
   </header>
+
 
   <main class="content">
 
@@ -162,10 +219,25 @@
     </h1>
 
     <div class="description">
-      送り状のバーコードをカメラ中央に合わせてください。
+      送り状のバーコードを白い枠の中に合わせてください。
+      認識すると自動で読み取ります。
     </div>
 
-    <div id="reader"></div>
+
+    <div class="camera-box">
+
+      <video
+        id="video"
+        autoplay
+        muted
+        playsinline>
+      </video>
+
+      <div class="scan-guide"></div>
+      <div class="scan-line"></div>
+
+    </div>
+
 
     <div
       id="status"
@@ -173,15 +245,21 @@
       カメラを起動しています...
     </div>
 
+
     <div id="resultBox">
 
-      <div>
-        読み取りました
+      <div class="result-label">
+        読み取り結果
       </div>
 
       <div
         id="resultNumber"
         class="number">
+      </div>
+
+      <div
+        id="resultFormat"
+        class="format">
       </div>
 
       <button
@@ -199,6 +277,12 @@
 
     </div>
 
+
+    <div class="hint">
+      バーコード全体が白い枠の中に入る距離で読み取ってください。<br>
+      カメラを近づけすぎる必要はありません。
+    </div>
+
   </main>
 
 </div>
@@ -206,20 +290,28 @@
 
 <script>
 
-let scanner = null;
+/*************************************************
+ * STATE
+ *************************************************/
+
+let codeReader = null;
+let controls = null;
+
 let scanLocked = false;
 let scannedNumber = '';
 
+let currentStream = null;
+
+
+/*************************************************
+ * START
+ *************************************************/
 
 window.addEventListener(
   'load',
   startScanner
 );
 
-
-/*************************************************
- * START
- *************************************************/
 
 async function startScanner() {
 
@@ -235,70 +327,225 @@ async function startScanner() {
     ''
   );
 
+
   try {
 
-    scanner =
-  new Html5Qrcode(
-    'reader',
-    {
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.ITF,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODABAR
-      ]
-    }
-  );
+    /*
+     * 読み取り対象を1次元バーコード中心に指定
+     */
+    const hints = new Map();
 
-    await scanner.start(
-      {
-        facingMode: 'environment'
-      },
-      {
-        fps: 10,
+    const formats = [
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.CODE_93,
+      ZXing.BarcodeFormat.CODABAR,
+      ZXing.BarcodeFormat.ITF,
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E
+    ];
 
-        qrbox: function(
-          width,
-          height
-        ) {
-
-          return {
-            width: Math.floor(
-              Math.min(width * 0.92, 430)
-            ),
-
-            height: Math.floor(
-              Math.min(height * 0.45, 180)
-            )
-          };
-        },
-
-        aspectRatio: 1.777778,
-        disableFlip: true
-      },
-
-      barcodeSuccess,
-
-      function() {
-        // 読取失敗フレームは無視
-      }
+    hints.set(
+      ZXing.DecodeHintType.POSSIBLE_FORMATS,
+      formats
     );
+
+    hints.set(
+      ZXing.DecodeHintType.TRY_HARDER,
+      true
+    );
+
+
+    codeReader =
+      new ZXing.BrowserMultiFormatReader(
+        hints
+      );
+
+
+    /*
+     * 背面カメラを優先
+     */
+    const devices =
+      await ZXing.BrowserCodeReader
+        .listVideoInputDevices();
+
+
+    if (
+      !devices ||
+      devices.length === 0
+    ) {
+
+      throw new Error(
+        '利用できるカメラが見つかりません。'
+      );
+    }
+
+
+    let selectedDeviceId =
+      devices[devices.length - 1].deviceId;
+
+
+    /*
+     * カメラ名が取得できる場合は
+     * back / rear / environment を優先
+     */
+    const rearCamera =
+      devices.find(device => {
+
+        const label =
+          String(
+            device.label || ''
+          ).toLowerCase();
+
+        return (
+          label.includes('back') ||
+          label.includes('rear') ||
+          label.includes('environment')
+        );
+
+      });
+
+
+    if (rearCamera) {
+      selectedDeviceId =
+        rearCamera.deviceId;
+    }
+
 
     setStatus(
       'バーコードを読み取ってください',
       ''
     );
 
+
+    /*
+     * 連続読取開始
+     */
+    await codeReader.decodeFromVideoDevice(
+      selectedDeviceId,
+      'video',
+
+      (result, error) => {
+
+        if (
+          result &&
+          !scanLocked
+        ) {
+
+          barcodeSuccess(result);
+        }
+
+        /*
+         * NotFoundException は
+         * 「そのフレームでは読めなかった」
+         * だけなので無視する
+         */
+        if (
+          error &&
+          !(
+            error instanceof
+            ZXing.NotFoundException
+          )
+        ) {
+
+          console.log(
+            'decode:',
+            error
+          );
+        }
+      }
+    );
+
+
+    /*
+     * iPhoneで可能なら
+     * カメラ解像度を高めに要求
+     */
+    const video =
+      document.getElementById(
+        'video'
+      );
+
+    if (
+      video &&
+      video.srcObject
+    ) {
+
+      currentStream =
+        video.srcObject;
+
+      const tracks =
+        currentStream.getVideoTracks();
+
+      if (
+        tracks &&
+        tracks.length
+      ) {
+
+        const track =
+          tracks[0];
+
+        const capabilities =
+          track.getCapabilities
+            ? track.getCapabilities()
+            : {};
+
+
+        const constraints = {
+          width: {
+            ideal: 1920
+          },
+
+          height: {
+            ideal: 1080
+          }
+        };
+
+
+        /*
+         * continuous autofocus が
+         * 利用可能なブラウザでは要求する
+         */
+        if (
+          capabilities.focusMode &&
+          capabilities.focusMode.includes(
+            'continuous'
+          )
+        ) {
+
+          constraints.advanced = [
+            {
+              focusMode:
+                'continuous'
+            }
+          ];
+        }
+
+
+        try {
+
+          await track.applyConstraints(
+            constraints
+          );
+
+        } catch (e) {
+
+          console.log(
+            'camera constraints:',
+            e
+          );
+        }
+      }
+    }
+
   } catch (error) {
 
     console.error(error);
 
     setStatus(
-      'カメラを起動できません：' +
+      'カメラ起動エラー：' +
       (
         error && error.message
           ? error.message
@@ -315,23 +562,34 @@ async function startScanner() {
  *************************************************/
 
 async function barcodeSuccess(
-  decodedText,
-  decodedResult
+  result
 ) {
 
   if (scanLocked) {
     return;
   }
 
-  let value =
-    normalizeTracking(decodedText);
+
+  const rawValue =
+    result.getText
+      ? result.getText()
+      : String(result.text || '');
+
+
+  const value =
+    normalizeTracking(
+      rawValue
+    );
+
 
   if (!value) {
     return;
   }
 
+
   scanLocked = true;
   scannedNumber = value;
+
 
   try {
 
@@ -344,16 +602,43 @@ async function barcodeSuccess(
   } catch (e) {}
 
 
+  let formatName = '';
+
+  try {
+
+    if (result.getBarcodeFormat) {
+
+      formatName =
+        String(
+          result.getBarcodeFormat()
+        );
+    }
+
+  } catch (e) {}
+
+
   await stopScanner();
+
 
   document.getElementById(
     'resultNumber'
   ).textContent =
     scannedNumber;
 
+
+  document.getElementById(
+    'resultFormat'
+  ).textContent =
+    formatName
+      ? '形式：' + formatName
+      : '';
+
+
   document.getElementById(
     'resultBox'
-  ).style.display = 'block';
+  ).style.display =
+    'block';
+
 
   setStatus(
     '✓ 読み取り完了',
@@ -368,27 +653,37 @@ async function barcodeSuccess(
 
 async function stopScanner() {
 
-  if (!scanner) {
-    return;
-  }
-
   try {
 
-    await scanner.stop();
+    if (codeReader) {
+      codeReader.reset();
+    }
 
   } catch (e) {
     console.log(e);
   }
 
+
   try {
 
-    await scanner.clear();
+    if (currentStream) {
+
+      currentStream
+        .getTracks()
+        .forEach(
+          track =>
+            track.stop()
+        );
+    }
 
   } catch (e) {
     console.log(e);
   }
 
-  scanner = null;
+
+  currentStream = null;
+  codeReader = null;
+  controls = null;
 }
 
 
@@ -400,11 +695,15 @@ async function restartScanner() {
 
   await stopScanner();
 
-  document.getElementById(
-    'reader'
-  ).innerHTML = '';
+  scanLocked = false;
+  scannedNumber = '';
 
-  startScanner();
+  document.getElementById(
+    'resultBox'
+  ).style.display =
+    'none';
+
+  await startScanner();
 }
 
 
@@ -412,31 +711,36 @@ async function restartScanner() {
  * NORMALIZE
  *************************************************/
 
-function normalizeTracking(value) {
+function normalizeTracking(
+  value
+) {
 
   let tracking =
     String(value || '')
       .trim()
       .replace(/\s+/g, '');
 
+
   /*
-   * ハンディ等で付加される
-   * 前後のアルファベットを除去
+   * バーコードに付加される
+   * 前後アルファベットを除去
    *
    * d500984340920d
-   * ↓
+   *   ↓
    * 500984340920
    */
 
-  tracking = tracking
-    .replace(
-      /^[A-Za-z]+(?=\d)/,
-      ''
-    )
-    .replace(
-      /(?<=\d)[A-Za-z]+$/,
-      ''
-    );
+  tracking =
+    tracking
+      .replace(
+        /^[A-Za-z]+(?=\d)/,
+        ''
+      )
+      .replace(
+        /(?<=\d)[A-Za-z]+$/,
+        ''
+      );
+
 
   return tracking;
 }
@@ -452,19 +756,19 @@ function returnToPortal() {
     return;
   }
 
+
   /*
-   * 次の工程で
-   * GASポータルのURLをここへ設定する。
+   * 今は単体テスト。
    *
-   * 今はカメラ単体テストなので
-   * まだ戻さない。
+   * 読取成功を確認したあと
+   * GASポータルへ番号を返す処理に変更する。
    */
 
   alert(
     '読取番号：' +
     scannedNumber +
     '\n\n' +
-    'カメラテスト成功です。'
+    'バーコード読取成功です。'
   );
 }
 
@@ -483,7 +787,10 @@ function setStatus(
       'status'
     );
 
-  box.textContent = message;
+
+  box.textContent =
+    message;
+
 
   box.className =
     'status' +
