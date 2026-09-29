@@ -309,6 +309,19 @@
 let scannerRunning = false;
 let scanLocked = false;
 
+  /*
+ * GASポータルから渡された情報
+ */
+const urlParams =
+  new URLSearchParams(
+    window.location.search
+  );
+
+const RETURN_URL =
+  urlParams.get('return') || '';
+
+const OWNER_CODE =
+  urlParams.get('owner') || '';
 
 /*************************************************
  * START
@@ -615,7 +628,44 @@ Quagga.onDetected(
       }
 
     } catch (e) {}
+/*
+ * GASポータルから開かれた場合は
+ * 読み取った問合番号を持って自動で戻る
+ */
+if (
+  RETURN_URL &&
+  OWNER_CODE
+) {
 
+  setStatus(
+    '✓ 読み取り完了　ポータルへ戻ります...',
+    'success'
+  );
+
+  const separator =
+    RETURN_URL.includes('?')
+      ? '&'
+      : '?';
+
+  const backUrl =
+    RETURN_URL +
+    separator +
+    'tracking=' +
+    encodeURIComponent(normalized) +
+    '&owner=' +
+    encodeURIComponent(OWNER_CODE);
+
+  /*
+   * 読取結果が一瞬見える程度だけ待って戻る
+   */
+  setTimeout(
+    () => {
+      window.location.href =
+        backUrl;
+    },
+    300
+  );
+}
   }
 );
 
