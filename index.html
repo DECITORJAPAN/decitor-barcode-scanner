@@ -1,3 +1,114 @@
+
+過去のメッセージを読み込み中…
+おｋ
+
+2m 6s考えました
+よし、ボス！完成版2本にまとめたよ 😆
+今回は部分修正じゃなく、そのまま丸ごと差し替え用。
+
+GAS側は、スキャナーから戻る際に 担当者ID・荷主・問合番号を引き継いで担当者を再認証 → 入荷受付画面へ復帰 → 問合番号チェックまで自動で進むように変更した。これで今までの「読んだらログイン画面へ戻る」を潰してある。元コードでは担当者情報がページ再読込で消える構造だった部分を修正してる。
+
+GitHub側は、「Quagga2 無料版テスト」「今回はテスト版です」などのテスト表示を全部撤去。デバッグ用の「Quagga2が実際に読んだ値」も外した。
+
+① GAS側 index.html
+これはGASの index.html を全部消して、丸ごと貼り付けでOK。
+
+② GitHub側 index.html
+こっちはGitHubの
+decitor-barcode-scanner → index.html を丸ごと差し替え。
+
+両方ともJavaScriptの構文チェックも通してある。
+
+差替え順は GitHub → GAS がいいね。GitHubをCommitして反映されたら、GASを保存して新バージョンでデプロイ。
+
+そのあとiPhoneで、
+
+ログイン → 荷主選択 → 📷バーコードを読み取る → 佐川 or 西濃をスキャン
+
+までやってみよう。
+
+狙ってる最終動作は、
+
+ピッ！ → 読取完了 → GASへ自動で戻る → ログイン状態復元 → 荷主復元 → 問合番号が自動で入る → 配送会社等の入力画面
+
+これ！🔥
+
+
+GAS_index_complete.html
+HTML
+
+GitHub_index_complete.html
+HTML
+HTML方式やだー
+あーー😂 そうだった。
+ボスが欲しいのはファイルを開いてコピペする方式じゃなくて、このチャットにコードをそのまま全部出す方式ね。
+
+もちろんそれでいこう。
+
+今回は長いから混ぜると危ないので、
+
+① GAS側 index.html フルコード
+↓ 差し替えてデプロイ・確認
+② GitHub側 index.html フルコード
+↓ Commitして確認
+
+の順で、コードブロックに丸ごと出す。
+
+しかも「途中省略」「既存部分はそのまま」は無し。
+Ctrl+A → 全削除 → コピペできる完全版にする。
+
+まず ① GAS側から出すね。
+
+お願い
+
+28s考えました
+もちろん！ただ、GAS側は 約4,500行あるから、このチャットに一発で貼ると途中で切れる危険がある。
+
+なので、コピペ用コードブロックを「GAS①〜③」に分けて連続で出すね。
+3つを上から順番につなげれば、そのまま index.html の完全版になる。
+
+まず GAS①（先頭〜） からいくよ。
+
+じゃ、ダウンロード版にしてー
+もちろんー！😆
+じゃあ ダウンロード版でいこう。こっちの方がフル差替えは安全！
+
+まずGAS側の完成版👇
+
+📦 GAS index.html 完成版
+これはGASの index.html を Ctrl+A → 全削除 → このファイルの中身を丸ごと貼り付けでOK。
+
+次にGitHub側👇
+
+📷 GitHub バーコードスキャナー完成版
+こっちはGitHubの decitor-barcode-scanner の index.html を丸ごと差し替え。
+
+「Quagga2 無料版テスト」「今回はテスト版です」等のテスト表記も削除済みにしてあるよ。
+
+今回は GitHub側を先に差替え → Commit → GAS側を差替え → 新バージョンでデプロイ の順でいこう！
+
+
+GAS_index_complete.html
+HTML
+
+GitHub_index_complete.html
+HTML
+ダウンロードをテキストでちょうだいってｗ
+
+あはは🤣 「.txtでダウンロード」ってことね！！
+了解、ボス。テキスト版にしたよ。
+
+これなら開いて Ctrl+A → Ctrl+C → それぞれの index.html に丸ごと貼り付けでOK！ 
+
+
+GAS_index_complete.txt
+ドキュメント
+
+GitHub_index_complete.txt
+ドキュメント
+
+
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -223,7 +334,7 @@
     </div>
 
     <div class="header-sub">
-      Quagga2 無料版テスト
+      入荷受付バーコードスキャナー
     </div>
   </header>
 
@@ -270,16 +381,6 @@
         class="format">
       </div>
 
-      <!-- テスト中だけ元データも表示 -->
-      <div class="raw-label">
-        Quagga2が実際に読んだ値
-      </div>
-
-      <div
-        id="rawNumber"
-        class="raw-number">
-      </div>
-
       <button
         type="button"
         onclick="restartScanner()">
@@ -288,12 +389,7 @@
 
     </div>
 
-
-    <div class="hint">
-      今回はテスト版です。<br>
-      まず佐川の問合番号バーコードが
-      読めるかだけ確認します。
-    </div>
+    <div class="hint">読取後、自動で入荷受付画面へ戻ります。</div>
 
   </main>
 
@@ -322,6 +418,9 @@ const RETURN_URL =
 
 const OWNER_CODE =
   urlParams.get('owner') || '';
+
+const USER_ID =
+  urlParams.get('user') || '';
 
 /*************************************************
  * START
@@ -586,12 +685,6 @@ Quagga.onDetected(
 
 
     document.getElementById(
-      'rawNumber'
-    ).textContent =
-      raw;
-
-
-    document.getElementById(
       'resultFormat'
     ).textContent =
       format
@@ -634,7 +727,8 @@ Quagga.onDetected(
  */
 if (
   RETURN_URL &&
-  OWNER_CODE
+  OWNER_CODE &&
+  USER_ID
 ) {
 
   setStatus(
@@ -653,7 +747,9 @@ if (
     'tracking=' +
     encodeURIComponent(normalized) +
     '&owner=' +
-    encodeURIComponent(OWNER_CODE);
+    encodeURIComponent(OWNER_CODE) +
+    '&user=' +
+    encodeURIComponent(USER_ID);
 
   /*
    * 読取結果が一瞬見える程度だけ待って戻る
