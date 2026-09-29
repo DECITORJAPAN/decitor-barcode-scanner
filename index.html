@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0,
+             maximum-scale=1.0, user-scalable=no">
+
+  <title>DECITOR BARCODE SCANNER</title>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f3f5f7;
+      color: #222;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Noto Sans JP",
+        "Yu Gothic",
+        sans-serif;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 620px;
+      min-height: 100vh;
+      margin: 0 auto;
+      background: #fff;
+    }
+
+    .header {
+      padding: 18px;
+      background: #1f2937;
+      color: #fff;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .header-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      opacity: .75;
+    }
+
+    .content {
+      padding: 22px 16px 40px;
+    }
+
+    .title {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .description {
+      margin-bottom: 20px;
+      color: #63707a;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #000;
+    }
+
+    #reader video {
+      width: 100% !important;
+      object-fit: cover;
+    }
+
+    .status {
+      margin-top: 16px;
+      padding: 13px;
+      border-radius: 8px;
+      background: #eef3f6;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .success {
+      background: #e8f6ed;
+      color: #176b4d;
+    }
+
+    .error {
+      background: #fdecea;
+      color: #a61b13;
+    }
+
+    .number {
+      margin-top: 12px;
+      font-size: 23px;
+      font-weight: 700;
+      word-break: break-all;
+    }
+
+    button {
+      width: 100%;
+      min-height: 54px;
+      margin-top: 16px;
+      border: 0;
+      border-radius: 10px;
+      background: #176b4d;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .secondary {
+      background: #fff;
+      border: 1px solid #aeb8c1;
+      color: #374650;
+    }
+
+    #resultBox {
+      display: none;
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid #bcd9c8;
+      border-radius: 10px;
+      background: #f0f8f3;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="header-title">
+      DECITOR BARCODE SCANNER
+    </div>
+
+    <div class="header-sub">
+      入荷問合番号 読取
+    </div>
+  </header>
+
+  <main class="content">
+
+    <h1 class="title">
+      📷 バーコード読取
+    </h1>
+
+    <div class="description">
+      送り状のバーコードをカメラ中央に合わせてください。
+    </div>
+
+    <div id="reader"></div>
+
+    <div
+      id="status"
+      class="status">
+      カメラを起動しています...
+    </div>
+
+    <div id="resultBox">
+
+      <div>
+        読み取りました
+      </div>
+
+      <div
+        id="resultNumber"
+        class="number">
+      </div>
+
+      <button
+        type="button"
+        onclick="returnToPortal()">
+        入荷ポータルへ戻る
+      </button>
+
+      <button
+        type="button"
+        class="secondary"
+        onclick="restartScanner()">
+        もう一度読む
+      </button>
+
+    </div>
+
+  </main>
+
+</div>
+
+
+<script>
+
+let scanner = null;
+let scanLocked = false;
+let scannedNumber = '';
+
+
+window.addEventListener(
+  'load',
+  startScanner
+);
+
+
+/*************************************************
+ * START
+ *************************************************/
+
+async function startScanner() {
+
+  scanLocked = false;
+  scannedNumber = '';
+
+  document.getElementById(
+    'resultBox'
+  ).style.display = 'none';
+
+  setStatus(
+    'カメラを起動しています...',
+    ''
+  );
+
+  try {
+
+    scanner =
+      new Html5Qrcode('reader');
+
+    await scanner.start(
+      {
+        facingMode: 'environment'
+      },
+      {
+        fps: 10,
+
+        qrbox: function(
+          width,
+          height
+        ) {
+
+          return {
+            width: Math.floor(
+              Math.min(width * 0.92, 430)
+            ),
+
+            height: Math.floor(
+              Math.min(height * 0.30, 130)
+            )
+          };
+        },
+
+        aspectRatio: 1.777778,
+        disableFlip: true
+      },
+
+      barcodeSuccess,
+
+      function() {
+        // 読取失敗フレームは無視
+      }
+    );
+
+    setStatus(
+      'バーコードを読み取ってください',
+      ''
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    setStatus(
+      'カメラを起動できません：' +
+      (
+        error && error.message
+          ? error.message
+          : String(error)
+      ),
+      'error'
+    );
+  }
+}
+
+
+/*************************************************
+ * SUCCESS
+ *************************************************/
+
+async function barcodeSuccess(
+  decodedText,
+  decodedResult
+) {
+
+  if (scanLocked) {
+    return;
+  }
+
+  let value =
+    normalizeTracking(decodedText);
+
+  if (!value) {
+    return;
+  }
+
+  scanLocked = true;
+  scannedNumber = value;
+
+  try {
+
+    if (
+      navigator.vibrate
+    ) {
+      navigator.vibrate(100);
+    }
+
+  } catch (e) {}
+
+
+  await stopScanner();
+
+  document.getElementById(
+    'resultNumber'
+  ).textContent =
+    scannedNumber;
+
+  document.getElementById(
+    'resultBox'
+  ).style.display = 'block';
+
+  setStatus(
+    '✓ 読み取り完了',
+    'success'
+  );
+}
+
+
+/*************************************************
+ * STOP
+ *************************************************/
+
+async function stopScanner() {
+
+  if (!scanner) {
+    return;
+  }
+
+  try {
+
+    await scanner.stop();
+
+  } catch (e) {
+    console.log(e);
+  }
+
+  try {
+
+    await scanner.clear();
+
+  } catch (e) {
+    console.log(e);
+  }
+
+  scanner = null;
+}
+
+
+/*************************************************
+ * RESTART
+ *************************************************/
+
+async function restartScanner() {
+
+  await stopScanner();
+
+  document.getElementById(
+    'reader'
+  ).innerHTML = '';
+
+  startScanner();
+}
+
+
+/*************************************************
+ * NORMALIZE
+ *************************************************/
+
+function normalizeTracking(value) {
+
+  let tracking =
+    String(value || '')
+      .trim()
+      .replace(/\s+/g, '');
+
+  /*
+   * ハンディ等で付加される
+   * 前後のアルファベットを除去
+   *
+   * d500984340920d
+   * ↓
+   * 500984340920
+   */
+
+  tracking = tracking
+    .replace(
+      /^[A-Za-z]+(?=\d)/,
+      ''
+    )
+    .replace(
+      /(?<=\d)[A-Za-z]+$/,
+      ''
+    );
+
+  return tracking;
+}
+
+
+/*************************************************
+ * RETURN TO PORTAL
+ *************************************************/
+
+function returnToPortal() {
+
+  if (!scannedNumber) {
+    return;
+  }
+
+  /*
+   * 次の工程で
+   * GASポータルのURLをここへ設定する。
+   *
+   * 今はカメラ単体テストなので
+   * まだ戻さない。
+   */
+
+  alert(
+    '読取番号：' +
+    scannedNumber +
+    '\n\n' +
+    'カメラテスト成功です。'
+  );
+}
+
+
+/*************************************************
+ * STATUS
+ *************************************************/
+
+function setStatus(
+  message,
+  type
+) {
+
+  const box =
+    document.getElementById(
+      'status'
+    );
+
+  box.textContent = message;
+
+  box.className =
+    'status' +
+    (
+      type
+        ? ' ' + type
+        : ''
+    );
+}
+
+</script>
+
+</body>
+</html>
