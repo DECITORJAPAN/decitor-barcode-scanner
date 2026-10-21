@@ -203,6 +203,8 @@
       font-weight: 700;
     }
 
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
     .hint {
       margin-top: 16px;
       color: #74808a;
@@ -237,7 +239,7 @@
     <div class="description">
       送り状の問合番号バーコードを
       白い枠の中央に合わせてください。<br>
-      認識すると自動で停止します。
+      位置を合わせて「読み取る」を押してください。
     </div>
 
 
@@ -249,6 +251,8 @@
     </div>
 
 
+    <button id="readButton" type="button" onclick="armScanner()" disabled>📷 読み取る</button>
+    <button type="button" onclick="restartScanner()" style="background:#536471;">🔄 撮り直し</button>
     <div id="status" class="status">
       カメラを起動しています...
     </div>
@@ -272,13 +276,13 @@
 
       <button
         type="button"
-        onclick="restartScanner()">
-        もう一度読む
+        onclick="returnToPortal()">
+        ✓ この番号で入荷受付へ戻る
       </button>
 
     </div>
 
-    <div class="hint">読取後、自動で入荷受付画面へ戻ります。</div>
+    <div class="hint">読取結果を確認してから入荷受付へ戻ります。</div>
 
   </main>
 
@@ -292,7 +296,9 @@
  *************************************************/
 
 let scannerRunning = false;
-let scanLocked = false;
+let scanLocked = true;
+let readArmed = false;
+let confirmedTracking = "";
 
   /*
  * GASポータルから渡された情報
@@ -323,7 +329,10 @@ window.addEventListener(
 
 function startScanner() {
 
-  scanLocked = false;
+  scanLocked = true;
+  readArmed = false;
+  confirmedTracking = '';
+  document.getElementById('readButton').disabled = true;
 
   document.getElementById(
     'resultBox'
@@ -469,10 +478,11 @@ function startScanner() {
         Quagga.start();
 
         scannerRunning = true;
+        document.getElementById("readButton").disabled = false;
 
 
         setStatus(
-          'バーコードを読み取ってください',
+          '中央に合わせて「読み取る」を押してください',
           ''
         );
 
@@ -505,7 +515,7 @@ function startScanner() {
 Quagga.onDetected(
   function(result) {
 
-    if (scanLocked) {
+    if (scanLocked || !readArmed) {
       return;
     }
 
@@ -558,7 +568,9 @@ Quagga.onDetected(
      * 1件読んだ瞬間にロック
      */
     scanLocked = true;
-
+    readArmed = false;
+    confirmedTracking = normalized;
+    document.getElementById("readButton").disabled = true;
 
     stopScanner();
 
@@ -610,47 +622,7 @@ Quagga.onDetected(
       }
 
     } catch (e) {}
-/*
- * GASポータルから開かれた場合は
- * 読み取った問合番号を持って自動で戻る
- */
-if (
-  RETURN_URL &&
-  OWNER_CODE &&
-  USER_ID
-) {
-
-  setStatus(
-    '✓ 読み取り完了　ポータルへ戻ります...',
-    'success'
-  );
-
-  const separator =
-    RETURN_URL.includes('?')
-      ? '&'
-      : '?';
-
-  const backUrl =
-    RETURN_URL +
-    separator +
-    'tracking=' +
-    encodeURIComponent(normalized) +
-    '&owner=' +
-    encodeURIComponent(OWNER_CODE) +
-    '&user=' +
-    encodeURIComponent(USER_ID);
-
-  /*
-   * 読取結果が一瞬見える程度だけ待って戻る
-   */
-  setTimeout(
-    () => {
-      window.location.href =
-        backUrl;
-    },
-    300
-  );
-}
+    setStatus('✓ 読み取り完了。番号を確認してください', 'success');
   }
 );
 
@@ -762,29 +734,35 @@ function stopScanner() {
  * RESTART
  *************************************************/
 
-function restartScanner() {
-
-  stopScanner();
-
+function armScanner() {
+  if (!scannerRunning || readArmed || confirmedTracking) return;
+  readArmed = true;
   scanLocked = false;
-
-
-  document.getElementById(
-    'resultBox'
-  ).style.display =
-    'none';
-
-
-  /*
-   * 少し待って再起動
-   */
-  setTimeout(
-    startScanner,
-    300
-  );
-
+  setStatus('読み取り中…バーコードを中央に保持してください', '');
 }
 
+function restartScanner() {
+  readArmed = false;
+  scanLocked = true;
+  confirmedTracking = '';
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('readButton').disabled = true;
+  stopScanner();
+  setTimeout(startScanner, 300);
+}
+
+function returnToPortal() {
+  if (!confirmedTracking) return;
+  if (!(RETURN_URL && OWNER_CODE && USER_ID)) {
+    setStatus('戻り先が指定されていません。番号を控えてください', 'error');
+    return;
+  }
+  const separator = RETURN_URL.includes('?') ? '&' : '?';
+  window.location.href = RETURN_URL + separator
+    + 'tracking=' + encodeURIComponent(confirmedTracking)
+    + '&owner=' + encodeURIComponent(OWNER_CODE)
+    + '&user=' + encodeURIComponent(USER_ID);
+}
 
 /*************************************************
  * STATUS
